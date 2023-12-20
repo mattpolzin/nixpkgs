@@ -3,9 +3,10 @@
 , fetchFromGitHub
 , asciidoctor
 , gnused
+, xcodegen
 #, testers
 #, xxd
-#, xcodebuild
+, xcodebuild
 }:
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "aerospace";
@@ -21,8 +22,9 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   nativeBuildInputs = [
     asciidoctor
     gnused
+    xcodegen
 #    installShellFiles
-#    xcodebuild
+    xcodebuild
 #    xxd
   ];
 
@@ -48,7 +50,15 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
     substituteInPlace ./generate.sh \
       --replace "gsed" "${gnused}/bin/sed" \
+
+    substituteInPlace ./build-release.sh \
+      --replace "git rev-parse HEAD" "echo ${finalAttrs.version}" \
+      --replace "git rev-parse --short HEAD" "echo ${finalAttrs.version}" \
+      --replace "git status --porcelain" "" \
+      --replace "git checkout LocalPackage/Sources/Common/gitHashGenerated.swift" ""
   '';
+
+  LOGNAME = "Nix";
 
   buildPhase = ''
     runHook preBuild
