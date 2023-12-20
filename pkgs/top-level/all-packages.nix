@@ -17334,7 +17334,10 @@ with pkgs;
 
   swiftpm2nix = callPackage ../development/tools/swiftpm2nix { };
 
-  xcodegen = callPackage ../development/tools/xcodegen { };
+  xcodegen = darwin.apple_sdk_11_0.callPackage ../development/tools/xcodegen {
+    stdenv = if stdenv.isDarwin then overrideLibcxx darwin.apple_sdk_11_0.llvmPackages_15.stdenv
+      else stdenv;
+  };
 
   swiProlog = callPackage ../development/compilers/swi-prolog {
     inherit (darwin.apple_sdk.frameworks) Security;
