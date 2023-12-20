@@ -17334,6 +17334,8 @@ with pkgs;
 
   swiftpm2nix = callPackage ../development/tools/swiftpm2nix { };
 
+  xcodegen = callPackage ../development/tools/xcodegen { };
+
   swiProlog = callPackage ../development/compilers/swi-prolog {
     inherit (darwin.apple_sdk.frameworks) Security;
   };
