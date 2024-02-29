@@ -19,6 +19,7 @@
 , pkgsBuildHost
 # configurePhase:
 , gnChromium
+, xcodebuild
 
 # Build inputs:
 , libpng
@@ -145,6 +146,8 @@ let
     os = platform:
       if platform.isLinux
       then "linux"
+      else if platform.isDarwin
+      then "mac"
       else throw "no chromium Rosetta Stone entry for os: ${platform.config}";
   };
 
@@ -161,6 +164,8 @@ let
       which
       buildPackages.${llvmPackages_attrName}.bintools
       bison gperf
+    ] ++ lib.optionals stdenv.isDarwin [
+#      xcodebuild
     ];
 
     depsBuildBuild = [
@@ -183,7 +188,6 @@ let
       (libpng.override { apngSupport = false; }) # https://bugs.chromium.org/p/chromium/issues/detail?id=752403
       bzip2 flac speex opusWithCustomModes
       libevent expat libjpeg snappy
-      libcap
     ] ++ lib.optionals (!xdg-utils.meta.broken) [
       xdg-utils
     ] ++ [
@@ -192,22 +196,20 @@ let
       ffmpeg libxslt libxml2
       nasm
       nspr nss
-      util-linux alsa-lib
+      util-linux
       libkrb5
       glib gtk3 dbus-glib
       libXScrnSaver libXcursor libXtst libxshmfence libGLU libGL
       mesa # required for libgbm
-      pciutils protobuf speechd libXdamage at-spi2-core
-      pipewire
-      libva
-      libdrm wayland mesa.drivers libxkbcommon
+      pciutils protobuf libXdamage at-spi2-core
+      wayland mesa.drivers libxkbcommon
       curl
       libepoxy
       libffi
-      libevdev
     ] ++ lib.optional systemdSupport systemd
       ++ lib.optionals cupsSupport [ libgcrypt cups ]
-      ++ lib.optional pulseSupport libpulseaudio;
+      ++ lib.optional pulseSupport libpulseaudio
+      ++ lib.optionals (!stdenv.isDarwin) [ libcap alsa-lib speechd pipewire libdrm libva libevdev ];
 
     patches = [
       ./patches/cross-compile.patch
@@ -243,7 +245,12 @@ let
       ./patches/chromium-121-rust.patch
     ];
 
-    postPatch = ''
+    postPatch = let
+      nodePath = let nodeHostOS = if stdenv.hostPlatform.isDarwin then "darwin" else "linux";
+                     rosettaHostCpu = chromiumRosettaStone.cpu stdenv.hostPlatform;
+                     rosettaHostOS = chromiumRosettaStone.os stdenv.hostPlatform;
+        in "${rosettaHostOS}/node-${nodeHostOS}-${rosettaHostCpu}";
+    in ''
       # Workaround/fix for https://bugs.chromium.org/p/chromium/issues/detail?id=1313361:
       substituteInPlace BUILD.gn \
         --replace '"//infra/orchestrator:orchestrator_all",' ""
@@ -251,6 +258,7 @@ let
       substituteInPlace build/config/compiler/BUILD.gn \
         --replace '"-Xclang",' "" \
         --replace '"-no-opaque-pointers",' ""
+    '' + lib.optionalString (!stdenv.isDarwin) ''
       # remove unused third-party
       for lib in ${toString gnSystemLibraries}; do
         if [ -d "third_party/$lib" ]; then
@@ -262,6 +270,7 @@ let
             -delete
         fi
       done
+    '' + ''
 
       if [[ -e native_client/SConstruct ]]; then
         # Required for patchShebangs (unsupported interpreter directive, basename: invalid option -- '*', etc.):
@@ -284,6 +293,7 @@ let
           'return sandbox_binary;' \
           'return base::FilePath(GetDevelSandboxPath());'
 
+    '' + lib.optionalString (!stdenv.isDarwin) ''
       substituteInPlace services/audio/audio_sandbox_hook_linux.cc \
         --replace \
           '/usr/share/alsa/' \
@@ -317,8 +327,8 @@ let
 
       patchShebangs .
       # Link to our own Node.js and Java (required during the build):
-      mkdir -p third_party/node/linux/node-linux-x64/bin
-      ln -s "${pkgsBuildHost.nodejs}/bin/node" third_party/node/linux/node-linux-x64/bin/node
+      mkdir -p third_party/node/${nodePath}/bin
+      ln -s "${pkgsBuildHost.nodejs}/bin/node" third_party/node/${nodePath}/bin/node
       ln -s "${pkgsBuildHost.jdk17_headless}/bin/java" third_party/jdk/current/bin/
 
       # Allow building against system libraries in official builds
@@ -350,6 +360,7 @@ let
       v8_target_cpu = chromiumRosettaStone.cpu stdenv.hostPlatform;
       target_os     = chromiumRosettaStone.os  stdenv.hostPlatform;
 
+    } // lib.optionalAttrs (!stdenv.isDarwin) {
       # Build Chromium using the system toolchain (for Linux distributions):
       #
       # What you would expect to be caled "target_toolchain" is
@@ -395,15 +406,17 @@ let
       # redistribute the chromium package; the Widevine component is either
       # added later in the wrapped -wv build or downloaded from Google:
       enable_widevine = true;
+    } // lib.optionalAttrs (!stdenv.isDarwin) {
       # Provides the enable-webrtc-pipewire-capturer flag to support Wayland screen capture:
       rtc_use_pipewire = true;
+      # To fix the build as we don't provide libffi_pic.a
+      # (ld.lld: error: unable to find library -l:libffi_pic.a):
+      use_system_libffi = true;
+    } // {
       # Disable PGO because the profile data requires a newer compiler version (LLVM 14 isn't sufficient):
       chrome_pgo_phase = 0;
       clang_base_path = "${pkgsBuildTarget.${llvmPackages_attrName}.stdenv.cc}";
       use_qt = false;
-      # To fix the build as we don't provide libffi_pic.a
-      # (ld.lld: error: unable to find library -l:libffi_pic.a):
-      use_system_libffi = true;
       # Use nixpkgs Rust compiler instead of the one shipped by Chromium.
       rust_sysroot_absolute = "${buildPackages.rustc}";
       # Rust is enabled for M121+, see next section:
@@ -440,7 +453,9 @@ let
 
       # This is to ensure expansion of $out.
       libExecPath="${libExecPath}"
+    '' + lib.optionalString (!stdenv.isDarwin) ''
       ${python3.pythonOnBuildForHost}/bin/python3 build/linux/unbundle/replace_gn_files.py --system-libraries ${toString gnSystemLibraries}
+    '' + ''
       ${gnChromium}/bin/gn gen --args=${lib.escapeShellArg gnFlags} out/Release | tee gn-gen-outputs.txt
 
       # Fail if `gn gen` contains a WARNING.

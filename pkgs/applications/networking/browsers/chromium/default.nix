@@ -187,7 +187,8 @@ in stdenv.mkDerivation {
 
   buildCommand = let
     browserBinary = "${chromiumWV}/libexec/chromium/chromium";
-    libPath = lib.makeLibraryPath [ libva pipewire wayland gtk3 gtk4 libkrb5 ];
+    libPath = lib.makeLibraryPath ([ wayland gtk3 gtk4 libkrb5 ]
+      ++ lib.optionals (!stdenv.isDarwin) [ libva pipewire ]);
 
   in with lib; ''
     mkdir -p "$out/bin"

@@ -88,7 +88,7 @@ mkChromiumDerivation (base: rec {
       then [ networkexception emilylange ]
       else [ networkexception emilylange ];
     license = if enableWideVine then lib.licenses.unfree else lib.licenses.bsd3;
-    platforms = lib.platforms.linux;
+#    platforms = lib.platforms.linux;
     mainProgram = "chromium";
     hydraPlatforms = lib.optionals (channel == "stable" || channel == "ungoogled-chromium") ["aarch64-linux" "x86_64-linux"];
     timeout = 172800; # 48 hours (increased from the Hydra default of 10h)
