@@ -11,6 +11,9 @@
   # These all need to be from SDK 11.0 or later starting with yabai 5.0.0
 , Carbon
 , Cocoa
+, CoreServices
+, CoreVideo
+, Kernel
 , ScriptingBridge
 , SkyLight
 }:
@@ -101,6 +104,9 @@ in
     buildInputs = [
       Carbon
       Cocoa
+      CoreServices
+      CoreVideo
+      Kernel
       ScriptingBridge
       SkyLight
     ];
@@ -117,8 +123,13 @@ in
       # aarch64 code is compiled on all targets, which causes our Apple SDK headers to error out.
       # Since multilib doesnt work on darwin i dont know of a better way of handling this.
       substituteInPlace makefile \
+      '' + (if stdenv.targetPlatform.isAarch64 then ''
+        --replace "-arch x86_64" "" \
+        --replace "payload.m -shared" "payload.m -shared -isystem ${Kernel}/Library/Frameworks/Kernel.framework/Headers" \
+      '' else ''
         --replace "-arch arm64e" "" \
         --replace "-arch arm64" "" \
+      '') + ''
         --replace "clang" "${stdenv.cc.targetPrefix}clang"
 
       # `NSScreen::safeAreaInsets` is only available on macOS 12.0 and above, which frameworks arent packaged.
@@ -148,4 +159,4 @@ in
       ];
     };
   };
-}.${stdenv.hostPlatform.system} or (throw "Unsupported platform ${stdenv.hostPlatform.system}")
+}.x86_64-darwin or (throw "Unsupported platform ${stdenv.hostPlatform.system}")

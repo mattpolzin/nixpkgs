@@ -41075,7 +41075,7 @@ with pkgs;
   xzoom = callPackage ../tools/X11/xzoom { };
 
   yabai = darwin.apple_sdk_11_0.callPackage ../os-specific/darwin/yabai {
-    inherit (darwin.apple_sdk_11_0.frameworks) SkyLight Cocoa Carbon ScriptingBridge;
+    inherit (darwin.apple_sdk_11_0.frameworks) Kernel SkyLight Cocoa Carbon CoreServices CoreVideo ScriptingBridge;
   };
 
   yacreader = libsForQt5.callPackage ../applications/graphics/yacreader { };
