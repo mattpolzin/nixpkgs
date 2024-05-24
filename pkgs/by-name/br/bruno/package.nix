@@ -33,12 +33,12 @@ buildNpmPackage' rec {
     owner = "usebruno";
     repo = "bruno";
     rev = "v${version}";
-    hash = "sha256-vYN245vMt/NjISaaFSXOkELONVld6knaKbi5FiN/0tA=";
-
-    postFetch = ''
-      ${lib.getExe npm-lockfile-fix} $out/package-lock.json
-    '';
+    hash = "sha256-HoupCCSbm/ZF4YnZSghmBAYwU2uBaWVoBPsJ2AyTTLw=";
   };
+
+  prePatch = ''
+    ${lib.getExe npm-lockfile-fix} package-lock.json
+  '';
 
   npmDepsHash = "sha256-NIf7aMDAeE39+putw/7GTYODIdVmjJIvIwnL5O+sBmI=";
   npmFlags = [ "--legacy-peer-deps" ];
@@ -146,12 +146,12 @@ buildNpmPackage' rec {
 
   passthru.updateScript = nix-update-script { };
 
-  meta = with lib; {
+  meta = {
     description = "Open-source IDE For exploring and testing APIs.";
     homepage = "https://www.usebruno.com";
     inherit (electron.meta) platforms;
-    license = licenses.mit;
-    maintainers = with maintainers; [ gepbird kashw2 lucasew mattpolzin water-sucks ];
+    license = lib.licenses.mit;
+    maintainers = with lib.maintainers; [ gepbird kashw2 lucasew mattpolzin water-sucks ];
     mainProgram = "bruno";
   };
 }
