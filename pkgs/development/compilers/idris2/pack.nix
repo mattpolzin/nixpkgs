@@ -8,6 +8,7 @@
   gnumake,
   zsh,
   makeBinaryWrapper,
+  installShellFiles,
   stdenv,
 }:
 let
@@ -184,7 +185,10 @@ let
       ilex-toml
     ];
 
-    nativeBuildInputs = [ makeBinaryWrapper ];
+    nativeBuildInputs = [
+      makeBinaryWrapper
+      installShellFiles
+      ];
 
     buildInputs = [
       gmp
@@ -207,6 +211,9 @@ let
             ++ lib.optionals stdenv.hostPlatform.isDarwin [ zsh ]
           )
         }
+
+      installShellCompletion \
+        --bash --name pack <($out/bin/pack completion-script pack)
     '';
 
     meta = {
